@@ -30,6 +30,8 @@ import software.amazon.awssdk.services.bedrockagentruntime.model.RetrieveRequest
 import software.amazon.awssdk.services.bedrockruntime.model.ContentBlock;
 import software.amazon.awssdk.services.bedrockruntime.model.ConversationRole;
 import software.amazon.awssdk.services.bedrockruntime.model.ConverseResponse;
+import software.amazon.awssdk.services.bedrockruntime.model.DocumentFormat;
+import software.amazon.awssdk.services.bedrockruntime.model.DocumentSource;
 import software.amazon.awssdk.services.bedrockruntime.model.ImageBlock;
 import software.amazon.awssdk.services.bedrockruntime.model.ImageFormat;
 import software.amazon.awssdk.services.bedrockruntime.model.ImageSource;
@@ -269,6 +271,27 @@ public class BedrockHelper {
         String response =  completeResponseTextBuffer.toString();
         System.out.println(response);
         return response;
+    }
+
+    //Real-time document insight
+    public static String documentInsight(String filePath,String modelId,String command) throws IOException {
+        var client = BedrockRuntimeClient.builder().region(Region.US_EAST_1).build();
+
+        
+        var fileContent = SdkBytes.fromByteArray(Files.readAllBytes(Paths.get(filePath)));
+
+        var textMessage = ContentBlock.fromText(command);
+        var document = ContentBlock.fromDocument(doc -> doc.name("document")
+                .format(DocumentFormat.PDF)
+                .source(DocumentSource.fromBytes(fileContent)));
+
+        var response = client.converse(req -> req
+                .modelId(modelId)
+                .messages(message -> message
+                        .role(ConversationRole.USER)
+                        .content(textMessage, document)));
+
+        return response.output().message().content().get(0).text();    
     }
     
 
