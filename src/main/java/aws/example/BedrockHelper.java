@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collection;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 import org.json.JSONObject;
@@ -16,6 +17,7 @@ import org.json.JSONPointer;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider;
 import software.amazon.awssdk.core.SdkBytes;
+import software.amazon.awssdk.core.document.Document;
 import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.bedrockruntime.BedrockRuntimeAsyncClient;
@@ -24,12 +26,19 @@ import software.amazon.awssdk.services.bedrockagentruntime.*;
 import software.amazon.awssdk.services.bedrockagentruntime.model.InvokeAgentRequest;
 import software.amazon.awssdk.services.bedrockagentruntime.model.InvokeAgentResponse;
 import software.amazon.awssdk.services.bedrockagentruntime.model.InvokeAgentResponseHandler;
+import software.amazon.awssdk.services.bedrockagentruntime.model.KnowledgeBaseRetrieveAndGenerateConfiguration;
+import software.amazon.awssdk.services.bedrockagentruntime.model.RetrieveAndGenerateConfiguration;
+import software.amazon.awssdk.services.bedrockagentruntime.model.RetrieveAndGenerateConfiguration.Builder;
 import software.amazon.awssdk.services.bedrockagentruntime.model.RetrieveAndGenerateInput;
 import software.amazon.awssdk.services.bedrockagentruntime.model.RetrieveAndGenerateRequest;
+import software.amazon.awssdk.services.bedrockagentruntime.model.RetrieveAndGenerateResponse;
+import software.amazon.awssdk.services.bedrockagentruntime.model.RetrieveAndGenerateType;
 import software.amazon.awssdk.services.bedrockagentruntime.model.RetrieveRequest;
+import software.amazon.awssdk.services.bedrockagentruntime.model.RetrieveResponse;
 import software.amazon.awssdk.services.bedrockruntime.model.ContentBlock;
 import software.amazon.awssdk.services.bedrockruntime.model.ConversationRole;
 import software.amazon.awssdk.services.bedrockruntime.model.ConverseResponse;
+import software.amazon.awssdk.services.bedrockruntime.model.DocumentBlock;
 import software.amazon.awssdk.services.bedrockruntime.model.DocumentFormat;
 import software.amazon.awssdk.services.bedrockruntime.model.DocumentSource;
 import software.amazon.awssdk.services.bedrockruntime.model.ImageBlock;
@@ -41,6 +50,13 @@ import software.amazon.awssdk.services.bedrockruntime.model.InvokeModelWithRespo
 import software.amazon.awssdk.services.bedrockruntime.model.InvokeModelWithResponseStreamResponseHandler;
 import software.amazon.awssdk.services.bedrockruntime.model.InvokeModelWithResponseStreamResponseHandler.Visitor;
 import software.amazon.awssdk.services.bedrockruntime.model.Message;
+import software.amazon.awssdk.services.bedrockruntime.model.Tool;
+import software.amazon.awssdk.services.bedrockruntime.model.ToolConfiguration;
+import software.amazon.awssdk.services.bedrockruntime.model.ToolInputSchema;
+import software.amazon.awssdk.services.bedrockruntime.model.ToolResultBlock;
+import software.amazon.awssdk.services.bedrockruntime.model.ToolResultContentBlock;
+import software.amazon.awssdk.services.bedrockruntime.model.ToolSpecification;
+import software.amazon.awssdk.services.bedrockruntime.model.ToolUseBlock;
 
 /*
  * This class contains basic methods for invoking AWS Bedrock generative AI model.
@@ -292,6 +308,156 @@ public class BedrockHelper {
                         .content(textMessage, document)));
 
         return response.output().message().content().get(0).text();    
+    }
+    //tools 
+    public static void useTool(String prompt)
+    {
+        
+       String modelId="cohere.command-r-v1:0";
+
+       Document sign = Document.mapBuilder()
+                .putString("type", "string")
+                .putString("description", "The call sign for the radio station for which you want the most popular song. Example calls signs are WZPZ, and WKRP.").build();
+
+        Document required = Document.listBuilder()
+                .addString("sign").build();
+
+        Document properties = Document.mapBuilder()
+                .putDocument("sign", sign).build();
+
+        Document json = Document.mapBuilder()
+                .putString("type", "object")
+                .putDocument("properties", properties)
+                .putDocument("required", required).build();
+        
+        String toolName = "topSongsTool";        
+        ToolSpecification.Builder builder  = ToolSpecification.builder().inputSchema(ToolInputSchema.builder().json(json).build());
+        builder.name(toolName);
+        Tool tool = Tool.fromToolSpec(builder.build());
+        
+
+        ToolConfiguration tc = ToolConfiguration.builder().tools(tool).build();
+
+        var client = BedrockRuntimeClient.builder().build();
+
+        Message message = Message.builder()
+                .content(ContentBlock.fromText("What is the most popular song on WZPZ?"))
+                .role(ConversationRole.USER)
+                .build();
+
+        // Send the message with a basic inference configuration.
+        ConverseResponse response = client.converse(request -> request
+        .modelId(modelId)
+        .messages(message)
+        .toolConfig(tc)
+        .inferenceConfig(config -> config
+                .maxTokens(1024)
+                .temperature(0.5F)
+                .topP(0.9F)));
+
+
+        //var responseText = response.output().message().content().get(0).text(); 
+        Collection<ContentBlock> col = response.output().message().content();
+        
+        col.forEach(cb ->
+        {
+           
+          ToolUseBlock tub = cb.toolUse();
+            if (tub!=null)
+            if (tub.name().equals(toolName))
+                    {
+                        String signValue = tub.input().asMap().get("sign").asString();
+                        try {
+                            String song = getTopSong(signValue);
+                            
+                            Collection<ToolResultContentBlock> trc = new ArrayList<ToolResultContentBlock>();
+
+                            Document td = Document.mapBuilder()
+                                          .putString("song", song)
+                                          .putString("artist", "8 Storey Hike")
+                                          .build();
+                            
+                            Document top = Document.mapBuilder()
+                                .putDocument("json", td)
+                                .build();
+                            
+                            
+                            trc.add(ToolResultContentBlock.fromJson(top));
+
+                            ToolResultBlock trb = ToolResultBlock.builder()
+                                            .toolUseId(tub.toolUseId())
+                                            .content(trc)
+                                            .build();
+                            
+                            var messageTr = Message.builder()
+                                    .role(ConversationRole.USER)
+                                    .content(ContentBlock.fromToolResult(trb))
+                                    .build();
+
+                            System.out.println(messageTr);
+
+                            var responseTr = client.converse(request -> request
+                                                .modelId(modelId)
+                                                .messages(messageTr)
+                                                .toolConfig(tc)
+                                                .inferenceConfig(config -> config
+                                                        .maxTokens(1024)
+                                                        .temperature(0.5F)
+                                                        .topP(0.9F)));
+                           
+                            System.out.println(responseTr); 
+
+                        } catch (Exception e) {
+                            System.out.println("\n"+e.getMessage());  
+                        }
+                       
+                    }
+            
+
+        });
+           
+         
+    }
+    private static String getTopSong(String sign) throws Exception
+    {
+        if (sign.equals("WZPZ"))
+          return "Elemental Hotel";
+        else
+           throw new Exception("Station "+sign+" not found.");
+    }
+
+    public static String queryKnowledgeBase(String knowledgeBaseId,
+                                          String query,
+                                          String modelArn) throws InterruptedException, ExecutionException {
+
+
+        // Create a Bedrock Runtime client
+        BedrockAgentRuntimeAsyncClient bedrockClient  = BedrockAgentRuntimeAsyncClient.builder().build();
+
+        // Create a retrieve request
+        RetrieveAndGenerateInput input  = RetrieveAndGenerateInput.builder()
+                .text(query)
+                .build();
+
+        RetrieveAndGenerateConfiguration conf  = RetrieveAndGenerateConfiguration.builder()
+                .knowledgeBaseConfiguration(KnowledgeBaseRetrieveAndGenerateConfiguration.builder()
+                                .knowledgeBaseId(knowledgeBaseId)
+                                .modelArn(modelArn)
+                                .build())
+                .type(RetrieveAndGenerateType.KNOWLEDGE_BASE)            
+                .build();
+
+        RetrieveAndGenerateRequest retrieveRequest = RetrieveAndGenerateRequest.builder()
+        .input(input)
+        .retrieveAndGenerateConfiguration(conf)
+        .build();
+
+        // Send the retrieve request
+        CompletableFuture<RetrieveAndGenerateResponse> retrieveResponse = bedrockClient.retrieveAndGenerate(retrieveRequest);
+
+
+        return retrieveResponse.get().output().text();
+        
     }
     
 
