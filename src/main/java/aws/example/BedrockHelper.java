@@ -8,6 +8,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collection;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 
@@ -44,6 +45,12 @@ import software.amazon.awssdk.services.bedrockruntime.model.InvokeModelWithRespo
 import software.amazon.awssdk.services.bedrockruntime.model.InvokeModelWithResponseStreamResponseHandler;
 import software.amazon.awssdk.services.bedrockruntime.model.InvokeModelWithResponseStreamResponseHandler.Visitor;
 import software.amazon.awssdk.services.bedrockruntime.model.Message;
+import software.amazon.awssdk.services.textract.TextractClient;
+import software.amazon.awssdk.services.textract.model.AnalyzeIdRequest;
+import software.amazon.awssdk.services.textract.model.AnalyzeIdResponse;
+import software.amazon.awssdk.services.textract.model.Document;
+import software.amazon.awssdk.services.textract.model.IdentityDocument;
+import software.amazon.awssdk.services.textract.model.TextractException;
 
 /*
  * This class contains basic methods for invoking AWS Bedrock generative AI model.
@@ -198,7 +205,6 @@ public class BedrockHelper {
         // Replace the DefaultCredentialsProvider with your preferred credentials provider.
         var client = BedrockRuntimeClient.builder()
                 .credentialsProvider(DefaultCredentialsProvider.create())
-                .region(Region.US_EAST_1)
                 .build();
 
         
@@ -313,6 +319,47 @@ public class BedrockHelper {
                         .build())              
                 .build())
         .get().output().text();
+    }
+
+ 
+
+    
+    public static void analyzeIdWithTextract( String filePath) throws IOException {
+
+        TextractClient textractClient = null;
+        try {
+                textractClient= TextractClient.builder()
+                .build();
+           
+                // Create a Document object and import image
+            Document myDoc = Document.builder()
+                    .bytes(SdkBytes.fromByteArray(Files.readAllBytes(Paths.get(filePath))))
+                    .build();
+            
+            AnalyzeIdRequest analyzeIdRequest = AnalyzeIdRequest.builder()
+                    .documentPages(myDoc).build();
+            
+            AnalyzeIdResponse analyzeId = textractClient.analyzeID(analyzeIdRequest);
+            
+           // System.out.println(analyzeExpense.toString());          
+            List<IdentityDocument> Docs = analyzeId.identityDocuments();
+            for (IdentityDocument doc: Docs) {
+               doc.identityDocumentFields().forEach((field)->{
+                  System.out.println(field.toString());
+               });;
+            }
+            
+            
+        } 
+        catch (TextractException e) {
+
+            System.err.println(e.getMessage());
+            
+        }
+        finally
+        {
+                textractClient.close();
+        }
     }
     
 
