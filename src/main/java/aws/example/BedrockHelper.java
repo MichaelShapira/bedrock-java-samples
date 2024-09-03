@@ -24,8 +24,11 @@ import software.amazon.awssdk.services.bedrockagentruntime.*;
 import software.amazon.awssdk.services.bedrockagentruntime.model.InvokeAgentRequest;
 import software.amazon.awssdk.services.bedrockagentruntime.model.InvokeAgentResponse;
 import software.amazon.awssdk.services.bedrockagentruntime.model.InvokeAgentResponseHandler;
+import software.amazon.awssdk.services.bedrockagentruntime.model.KnowledgeBaseRetrieveAndGenerateConfiguration;
+import software.amazon.awssdk.services.bedrockagentruntime.model.RetrieveAndGenerateConfiguration;
 import software.amazon.awssdk.services.bedrockagentruntime.model.RetrieveAndGenerateInput;
 import software.amazon.awssdk.services.bedrockagentruntime.model.RetrieveAndGenerateRequest;
+import software.amazon.awssdk.services.bedrockagentruntime.model.RetrieveAndGenerateType;
 import software.amazon.awssdk.services.bedrockagentruntime.model.RetrieveRequest;
 import software.amazon.awssdk.services.bedrockruntime.model.ContentBlock;
 import software.amazon.awssdk.services.bedrockruntime.model.ConversationRole;
@@ -292,6 +295,24 @@ public class BedrockHelper {
                         .content(textMessage, document)));
 
         return response.output().message().content().get(0).text();    
+    }
+
+    public static String queryKnowledgeBase(String kbId,String text,String modelArn) throws InterruptedException, ExecutionException
+    {
+        BedrockAgentRuntimeAsyncClient client  = BedrockAgentRuntimeAsyncClient.builder().build();
+        return client.retrieveAndGenerate(RetrieveAndGenerateRequest.builder()
+                .input(RetrieveAndGenerateInput.builder()
+                        .text(text)
+                        .build())  
+                .retrieveAndGenerateConfiguration(RetrieveAndGenerateConfiguration.builder()
+                        .knowledgeBaseConfiguration(KnowledgeBaseRetrieveAndGenerateConfiguration.builder()
+                                        .knowledgeBaseId(kbId)
+                                        .modelArn(modelArn)
+                                        .build() )                       
+                        .type(RetrieveAndGenerateType.KNOWLEDGE_BASE)
+                        .build())              
+                .build())
+        .get().output().text();
     }
     
 
