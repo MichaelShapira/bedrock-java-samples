@@ -8,16 +8,10 @@ public class Main {
     
     public static void main(String[] args) throws IOException, ExecutionException, InterruptedException {
         String modelId = "anthropic.claude-3-haiku-20240307-v1:0";
-        String prompt = "Write a poem about Harry Poter";
-        
-        /*
-        System.out.println("\n\n");
-        BedrockHelper.queryKnowledgeBase("XXXXXXXXX",  
-                                         "Tell me the story of Captain Ahab?",
-                                         "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-haiku-20240307-v1:0");
+        String prompt = "Provide details about beluga. Provide a lot of details and format your answer in JSON format";
         
         BedrockHelper.invokeModel(modelId, prompt);
-        
+
         BedrockHelper.invokeModelWithStream(modelId, prompt);
         
         BedrockHelper.converseApi(modelId,"/dummy_full_path_to_image");
@@ -29,8 +23,6 @@ public class Main {
         
         BedrockHelper.documentInsight("/dummy_full_path_to_document", modelId, "Summarize the document");
         
-        BedrockHelper.useTool( prompt);
-        */
         System.out.println("\n");
     }
 }
