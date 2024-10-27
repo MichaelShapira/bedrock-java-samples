@@ -7,3 +7,4 @@
 5. Query document content
 6. Invoke agent
 7. Query knowledge base
+8. Working with tools
