@@ -55,6 +55,7 @@ import software.amazon.awssdk.services.bedrockruntime.model.ToolResultBlock;
 import software.amazon.awssdk.services.bedrockruntime.model.ToolResultContentBlock;
 import software.amazon.awssdk.services.bedrockruntime.model.ToolSpecification;
 import software.amazon.awssdk.services.bedrockruntime.model.ToolUseBlock;
+import software.amazon.awssdk.services.bedrockruntime.model.Trace;
 import software.amazon.awssdk.services.textract.TextractClient;
 import software.amazon.awssdk.services.textract.model.AnalyzeIdRequest;
 import software.amazon.awssdk.services.textract.model.AnalyzeIdResponse;
@@ -82,7 +83,6 @@ public class BedrockHelper {
             // Replace the DefaultCredentialsProvider with your preferred credentials provider.
             BedrockRuntimeClient client = BedrockRuntimeClient.builder()
                     .credentialsProvider(DefaultCredentialsProvider.create())
-                    .region(Region.US_EAST_1)
                     .build();
     
             // Set the model ID, e.g., Claude 3 Haiku.
@@ -96,10 +96,12 @@ public class BedrockHelper {
                         "anthropic_version": "bedrock-2023-05-31",
                         "max_tokens": 512,
                         "temperature": 0.5,
-                        "messages": [{
-                            "role": "user",
-                            "content": "{{prompt}}"
-                        }]
+                        "messages" : [
+                                {
+                                "role" : "user",
+                                "content" : [ {"type" : "text", "text" : "{{prompt}}"} ]
+                                }
+                        ]
                     }""";
     
             // Define the prompt for the model.
@@ -113,6 +115,7 @@ public class BedrockHelper {
                 InvokeModelResponse response = client.invokeModel(request -> request
                         .body(SdkBytes.fromUtf8String(nativeRequest))
                         .modelId(modelId)
+                        .trace(Trace.ENABLED)
                 );
     
                 // Decode the response body.
@@ -146,7 +149,6 @@ public class BedrockHelper {
         // Replace the DefaultCredentialsProvider with your preferred credentials provider.
         var client = BedrockRuntimeAsyncClient.builder()
                 .credentialsProvider(DefaultCredentialsProvider.create())
-                .region(Region.US_EAST_1)
                 .build();
 
   
@@ -161,7 +163,7 @@ public class BedrockHelper {
                     "temperature": 0.5,
                     "messages": [{
                         "role": "user",
-                        "content": "{{prompt}}"
+                        "content" : [ {"type" : "text", "text" : "{{prompt}}"} ]
                     }]
                 }""";
 
